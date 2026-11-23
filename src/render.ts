@@ -132,7 +132,8 @@ export function prBody(r: Report, issue: number | null): string {
     ),
     ...r.apply.applied.map((a) => {
       const d = decisions.get(a.package)!;
-      return section(`### \`${a.package}\``, analysis(d), changelogLinks(factsByName.get(a.package)?.changelogs ?? []));
+      const changelogs = (factsByName.get(a.package)?.changelogs ?? []).map((c) => (c.package === a.package ? toApplied(c, a.to) : c));
+      return section(`### \`${a.package}\``, analysis(d), changelogLinks(changelogs));
     }),
     section("### Verification", r.apply.verify.map((v) => `- ${v.ok ? "✅" : "❌"} \`${v.command}\``).join("\n")),
   ];
@@ -169,6 +170,14 @@ function analysis(d: Decision): string {
     lines.push(`**Breaking changes**\n\n${d.breakingChanges.map((b) => `- ${b}`).join("\n")}`);
   }
   return lines.join("\n\n");
+}
+
+function toApplied(c: Changelog, applied: string[]): Changelog {
+  const latest = applied.at(-1);
+  if (!latest || latest === c.to) return c;
+  const at = c.compareUrl?.lastIndexOf(c.to) ?? -1;
+  const compareUrl = c.compareUrl && at >= 0 ? `${c.compareUrl.slice(0, at)}${latest}${c.compareUrl.slice(at + c.to.length)}` : c.compareUrl;
+  return { ...c, to: latest, compareUrl };
 }
 
 function changelogLinks(changelogs: Changelog[]): string | null {

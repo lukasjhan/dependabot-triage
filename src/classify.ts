@@ -165,7 +165,7 @@ function clean(text: string): string {
     .replace(/\bhttps?:\/\/\S+/gi, "[link removed]")
     .replace(/<[^>]*>/g, "")
     .split(/(`[^`]*`)/)
-    .map((part) => (part.startsWith("`") ? part : part.replace(/@[\w-]+(?:\/[\w.-]+)?/g, "`$&`")))
+    .map((part) => (part.startsWith("`") ? part : part.replace(/@[\w-]+(?:\/[\w.-]*[\w-])?/g, "`$&`")))
     .join("")
     .trim();
 }
