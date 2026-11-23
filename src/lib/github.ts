@@ -11,7 +11,7 @@ export class GitHubError extends Error {
 export class GitHub {
   readonly owner: string;
   readonly repo: string;
-  private readonly token: string;
+  readonly token: string;
 
   constructor(token: string, repository: string) {
     const [owner, repo] = repository.split("/");

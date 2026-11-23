@@ -12,7 +12,8 @@
     "collect": "node src/collect.ts",
     "facts": "node src/facts.ts",
     "classify": "node src/classify.ts",
-    "apply": "node src/apply.ts"
+    "apply": "node src/apply.ts",
+    "publish": "node src/publish.ts"
   },
   "dependencies": {
     "semver": "7.8.6"
