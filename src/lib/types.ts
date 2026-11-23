@@ -19,3 +19,36 @@ export type Alert = {
   vulnerableRange: string;
   patchedVersion: string | null;
 };
+
+export type ClassHint = "no-fix" | "already-fixed" | "lockfile" | "override" | "breaking";
+
+export type Edge = {
+  parent: string;
+  declaredRange: string | null;
+  childVersion: string;
+  via: string;
+  targetSatisfies: boolean | null;
+  parentFixVersion: string | null;
+};
+
+export type DirectDep = {
+  name: string;
+  declaredRange: string | null;
+  dev: boolean;
+  latest: string;
+};
+
+export type PackageFacts = {
+  package: string;
+  alerts: number[];
+  severity: Severity;
+  malware: boolean;
+  targetVersion: string | null;
+  targetPublishedAt: string | null;
+  installed: string[];
+  prodReachable: boolean;
+  existingOverride: string | null;
+  directVia: DirectDep[];
+  edges: Edge[];
+  hint: ClassHint;
+};
