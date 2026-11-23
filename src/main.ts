@@ -14,7 +14,7 @@ if (major < 24) throw new Error(`dependabot-triage needs Node.js 24 or newer, fo
 const cwd = resolve(process.env.TRIAGE_WORKDIR ?? process.cwd());
 const out = resolve(process.env.TRIAGE_OUT ?? join(cwd, ".dependabot-triage"));
 const dryRun = process.env.TRIAGE_DRY_RUN === "true";
-const config = await loadConfig(resolve(cwd, process.env.TRIAGE_CONFIG ?? ".github/dependabot-triage.yml"));
+const config = await loadConfig(resolve(cwd, process.env.TRIAGE_CONFIG ?? ".github/dependabot-triage.yml"), process.env.TRIAGE_SETTINGS);
 const gh = GitHub.fromEnv();
 
 await access(join(cwd, "node_modules")).catch(() => {

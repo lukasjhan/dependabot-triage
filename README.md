@@ -15,7 +15,7 @@ Unlike a plain version bump, every package gets an impact analysis grounded in y
 - Dependabot alerts enabled on the repository
 - A pnpm project (npm and yarn are planned)
 - Node.js 24 or newer, and the project's dependencies installed before the action runs
-- An Anthropic API key
+- An Anthropic API key, or a Claude subscription token from `claude setup-token`
 
 ## Usage
 
@@ -61,14 +61,19 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          dry-run: ${{ inputs.dry_run || false }}
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          settings: |
+            verify:
+              - pnpm lint
+              - pnpm test
+              - pnpm build
 ```
 
 Scheduled runs publish for real. Manual runs default to a dry run, which writes the report to the job summary only.
 
 ## Configuration
 
-`.github/dependabot-triage.yml`, every key optional:
+Pass the configuration inline with the `settings` input, or keep it in `.github/dependabot-triage.yml`. `settings` wins when both are present. Every key is optional:
 
 ```yaml
 base_branch: main            # default: the repository's default branch
@@ -102,6 +107,13 @@ The token needs these repository permissions:
 
 - **GitHub App (recommended).** Create an app with the permissions above and webhooks disabled, install it on the repository, and mint a token with [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token).
 - **Fine-grained personal access token.** Scope it to the repository with the permissions above. Issues and pull requests will be authored by your account.
+
+### Claude
+
+Provide one of:
+
+- `anthropic-api-key`: billed per use through the Anthropic API.
+- `claude-code-oauth-token`: uses a Claude subscription. Run `claude setup-token` locally and store the token as a secret. Runs count against that account's usage limits, and the workflow stops working if the subscription ends.
 
 ## How it works
 

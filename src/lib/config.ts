@@ -28,14 +28,17 @@ const DEFAULTS: Config = {
 
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
 
-export async function loadConfig(path: string): Promise<Config> {
-  let raw: string;
+export async function loadConfig(path: string, inline?: string): Promise<Config> {
+  if (inline?.trim()) return parseConfig(inline);
   try {
-    raw = await readFile(path, "utf8");
+    return parseConfig(await readFile(path, "utf8"));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return DEFAULTS;
     throw err;
   }
+}
+
+export function parseConfig(raw: string): Config {
   const doc = (parse(raw) ?? {}) as Record<string, unknown>;
   const devOnly = (doc.dev_only ?? {}) as Record<string, unknown>;
   const claude = (doc.claude ?? {}) as Record<string, unknown>;

@@ -10,10 +10,16 @@ inputs:
     description: GitHub App installation token or fine-grained PAT with Contents, Pull requests, Issues and Dependabot alerts read and write
     required: true
   anthropic-api-key:
-    description: Anthropic API key used by Claude Code
-    required: true
+    description: Anthropic API key. Provide this or claude-code-oauth-token
+    required: false
+  claude-code-oauth-token:
+    description: Claude subscription token from `claude setup-token`. Provide this or anthropic-api-key
+    required: false
+  settings:
+    description: Configuration as inline YAML. Takes precedence over the config file
+    required: false
   config:
-    description: Path to the configuration file, relative to working-directory
+    description: Path to the configuration file, relative to working-directory, used when settings is empty
     default: .github/dependabot-triage.yml
   working-directory:
     description: Directory of the project to triage
@@ -53,6 +59,8 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        TRIAGE_SETTINGS: ${{ inputs.settings }}
         TRIAGE_CONFIG: ${{ inputs.config }}
         TRIAGE_DRY_RUN: ${{ inputs.dry-run }}
         TRIAGE_OUT: ${{ runner.temp }}/dependabot-triage
@@ -61,5 +69,11 @@ runs:
         GIT_COMMITTER_NAME: ${{ inputs.git-user-name }}
         GIT_COMMITTER_EMAIL: ${{ inputs.git-user-email }}
       run: |
+        [ -n "$ANTHROPIC_API_KEY" ] || unset ANTHROPIC_API_KEY
+        [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || unset CLAUDE_CODE_OAUTH_TOKEN
+        if [ -z "${ANTHROPIC_API_KEY:-}${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+          echo "::error::Provide anthropic-api-key or claude-code-oauth-token"
+          exit 1
+        fi
         export CLAUDE_BIN="$GITHUB_ACTION_PATH/node_modules/.bin/claude"
         node "$GITHUB_ACTION_PATH/src/main.ts"
