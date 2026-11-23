@@ -9,6 +9,15 @@ For each vulnerable package listed in the facts, decide how it should be fixed a
 - `manual`: a human must decide. Use it for major bumps, 0.x minor bumps, no available fix, or any case where the update could change behavior this codebase relies on.
 - `dev-only`: the package never reaches production runtime.
 
+## Risk
+
+Rate `risk` for this codebase, not the advisory's generic severity.
+
+- `none`: the vulnerable code path is unreachable here.
+- `low`: reachable only from internal or trusted input, or the impact is negligible.
+- `medium`: reachable from external input, leading to information disclosure or limited impact.
+- `high`: reachable from external input, leading to code execution, authentication bypass or broad data exposure.
+
 ## Rules
 
 1. Start from `hint` in the facts. You may only move a package to a more cautious class (`lockfile` → `override` → `manual`). Never move it to a less cautious one.
