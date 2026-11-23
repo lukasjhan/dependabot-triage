@@ -17,7 +17,10 @@ type RawAlert = {
     ghsa_id: string;
     cve_id: string | null;
     summary: string;
+    description: string;
     severity: Alert["severity"];
+    references: { url: string }[];
+    cwes: { cwe_id: string }[];
   };
   security_vulnerability: {
     vulnerable_version_range: string;
@@ -41,6 +44,9 @@ export async function collect(gh: GitHub): Promise<Alert[]> {
     ghsa: a.security_advisory.ghsa_id,
     cve: a.security_advisory.cve_id,
     summary: a.security_advisory.summary,
+    description: a.security_advisory.description,
+    references: a.security_advisory.references.map((r) => r.url),
+    cwes: a.security_advisory.cwes.map((c) => c.cwe_id),
     severity: a.security_advisory.severity,
     advisoryType: types.get(a.security_advisory.ghsa_id) ?? "unknown",
     vulnerableRange: a.security_vulnerability.vulnerable_version_range,

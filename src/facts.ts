@@ -3,7 +3,10 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import semver from "semver";
-import type { Alert, ClassHint, DirectDep, Edge, PackageFacts } from "./lib/types.ts";
+import { changelog } from "./changelog.ts";
+import { GitHub } from "./lib/github.ts";
+import { packument, type Manifest } from "./lib/registry.ts";
+import type { Alert, Changelog, ClassHint, DirectDep, Edge, PackageFacts } from "./lib/types.ts";
 
 const exec = promisify(execFile);
 
@@ -17,25 +20,17 @@ type WhyNode = {
   optionalDependencies?: Record<string, WhyNode>;
 };
 
-type Manifest = {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
-  pnpm?: { overrides?: Record<string, string> };
-};
-
-export async function facts(alerts: Alert[], cwd: string): Promise<PackageFacts[]> {
+export async function facts(gh: GitHub, alerts: Alert[], cwd: string): Promise<PackageFacts[]> {
   const root = await readManifest(cwd);
   const groups = Map.groupBy(alerts, (a) => a.package);
   const result: PackageFacts[] = [];
   for (const [name, group] of groups) {
-    result.push(await packageFacts(name, group, cwd, root));
+    result.push(await packageFacts(gh, name, group, cwd, root));
   }
   return result;
 }
 
-async function packageFacts(name: string, alerts: Alert[], cwd: string, root: Manifest): Promise<PackageFacts> {
+async function packageFacts(gh: GitHub, name: string, alerts: Alert[], cwd: string, root: Manifest): Promise<PackageFacts> {
   const patched = alerts.map((a) => a.patchedVersion);
   const targetVersion = patched.includes(null) ? null : semver.rsort(patched as string[])[0];
 
@@ -57,6 +52,7 @@ async function packageFacts(name: string, alerts: Alert[], cwd: string, root: Ma
     existingOverride: root.pnpm?.overrides?.[name] ?? null,
     directVia: await Promise.all(directVia.map((d) => directDep(d, root))),
     edges,
+    changelogs: await changelogs(gh, name, installed, targetVersion, edges),
     hint: hint(targetVersion, installed, edges),
   };
 }
@@ -109,6 +105,23 @@ async function parentFixVersion(parent: string, current: string, child: string, 
     if (range && semver.satisfies(target, range)) return v;
   }
   return null;
+}
+
+async function changelogs(
+  gh: GitHub,
+  name: string,
+  installed: string[],
+  target: string | null,
+  edges: Edge[],
+): Promise<Changelog[]> {
+  const result: Changelog[] = [];
+  if (target && installed.length > 0) result.push(await changelog(gh, name, installed[0], target));
+  for (const e of edges) {
+    if (!e.parentFixVersion) continue;
+    const at = e.parent.lastIndexOf("@");
+    result.push(await changelog(gh, e.parent.slice(0, at), e.parent.slice(at + 1), e.parentFixVersion));
+  }
+  return result;
 }
 
 function children(node: WhyNode): [string, WhyNode][] {
@@ -164,27 +177,6 @@ async function readManifest(dir: string): Promise<Manifest> {
   return JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as Manifest;
 }
 
-type Packument = {
-  "dist-tags": { latest: string };
-  time: Record<string, string>;
-  versions: Record<string, Manifest>;
-};
-
-const registry = new Map<string, Promise<Packument>>();
-
-function packument(name: string): Promise<Packument> {
-  if (!registry.has(name)) {
-    registry.set(
-      name,
-      fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}`).then((r) => {
-        if (!r.ok) throw new Error(`registry ${name} -> ${r.status}`);
-        return r.json();
-      }),
-    );
-  }
-  return registry.get(name)!;
-}
-
 async function publishedAt(name: string, version: string): Promise<string | null> {
   return (await packument(name)).time[version] ?? null;
 }
@@ -196,7 +188,7 @@ async function latestVersion(name: string): Promise<string> {
 if (import.meta.main) {
   const [input = "out/alerts.json", output = "out/facts.json", cwd = process.cwd()] = process.argv.slice(2);
   const alerts = JSON.parse(await readFile(input, "utf8")) as Alert[];
-  const result = await facts(alerts, cwd);
+  const result = await facts(GitHub.fromEnv(), alerts, cwd);
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, JSON.stringify(result, null, 2));
   console.log(`built facts for ${result.length} packages -> ${output}`);

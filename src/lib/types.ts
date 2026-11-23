@@ -14,6 +14,9 @@ export type Alert = {
   ghsa: string;
   cve: string | null;
   summary: string;
+  description: string;
+  references: string[];
+  cwes: string[];
   severity: Severity;
   advisoryType: AdvisoryType;
   vulnerableRange: string;
@@ -50,5 +53,16 @@ export type PackageFacts = {
   existingOverride: string | null;
   directVia: DirectDep[];
   edges: Edge[];
+  changelogs: Changelog[];
   hint: ClassHint;
+};
+
+export type Changelog = {
+  package: string;
+  from: string;
+  to: string;
+  source: "releases" | "changelog-file" | null;
+  repoUrl: string | null;
+  compareUrl: string | null;
+  text: string | null;
 };
