@@ -34,9 +34,12 @@ async function packageFacts(gh: GitHub, name: string, alerts: Alert[], cwd: stri
   const patched = alerts.map((a) => a.patchedVersion);
   const targetVersion = patched.includes(null) ? null : semver.rsort(patched as string[])[0];
 
+  const ranges = [...new Set(alerts.map((a) => normalizeRange(a.vulnerableRange)))];
+  const vulnerable = (version: string) => ranges.some((r) => semver.satisfies(version, r));
+
   const all = await why(name, cwd, false);
   const prod = await why(name, cwd, true);
-  const edges = await collectEdges(name, all, targetVersion);
+  const edges = await collectEdges(name, all, targetVersion, vulnerable);
   const installed = [...new Set(edges.map((e) => e.childVersion))].sort(semver.compare);
   const directVia = [...new Set(edges.map((e) => e.via))];
 
@@ -47,8 +50,9 @@ async function packageFacts(gh: GitHub, name: string, alerts: Alert[], cwd: stri
     malware: alerts.some((a) => a.advisoryType === "malware"),
     targetVersion,
     targetPublishedAt: targetVersion ? await publishedAt(name, targetVersion) : null,
+    vulnerableRanges: ranges,
     installed,
-    prodReachable: prod.some((n) => findsPackage(n, name)),
+    prodReachable: prod.some((n) => findsPackage(n, name, vulnerable)),
     existingOverride: root.pnpm?.overrides?.[name] ?? null,
     directVia: await Promise.all(directVia.map((d) => directDep(d, root))),
     edges,
@@ -63,7 +67,16 @@ async function why(name: string, cwd: string, prodOnly: boolean): Promise<WhyNod
   return stdout.trim() ? (JSON.parse(stdout) as WhyNode[]) : [];
 }
 
-async function collectEdges(name: string, importers: WhyNode[], target: string | null): Promise<Edge[]> {
+export function normalizeRange(range: string): string {
+  return range.replaceAll(",", " ");
+}
+
+async function collectEdges(
+  name: string,
+  importers: WhyNode[],
+  target: string | null,
+  vulnerable: (version: string) => boolean,
+): Promise<Edge[]> {
   const seen = new Map<string, Edge>();
 
   async function walk(node: WhyNode, parent: string | null, via: string | null): Promise<void> {
@@ -74,7 +87,7 @@ async function collectEdges(name: string, importers: WhyNode[], target: string |
         continue;
       }
       const key = `${label}>${child.version}`;
-      if (seen.has(key)) continue;
+      if (seen.has(key) || !vulnerable(child.version)) continue;
       const range = declaredRange(await readManifest(node.path), name);
       const satisfies = target && range ? semver.satisfies(target, range) : null;
       seen.set(key, {
@@ -132,8 +145,8 @@ function children(node: WhyNode): [string, WhyNode][] {
   ];
 }
 
-function findsPackage(node: WhyNode, name: string): boolean {
-  return children(node).some(([n, c]) => n === name || findsPackage(c, name));
+function findsPackage(node: WhyNode, name: string, vulnerable: (version: string) => boolean): boolean {
+  return children(node).some(([n, c]) => (n === name ? vulnerable(c.version) : findsPackage(c, name, vulnerable)));
 }
 
 function declaredRange(manifest: Manifest, name: string): string | null {
@@ -157,8 +170,8 @@ async function directDep(name: string, root: Manifest): Promise<DirectDep> {
 }
 
 function hint(target: string | null, installed: string[], edges: Edge[]): ClassHint {
+  if (installed.length === 0) return "already-fixed";
   if (!target) return "no-fix";
-  if (installed.length > 0 && installed.every((v) => semver.gte(v, target))) return "already-fixed";
   if (edges.every((e) => e.targetSatisfies === true)) return "lockfile";
   const breaking = installed.some((v) => {
     if (semver.major(v) !== semver.major(target)) return true;

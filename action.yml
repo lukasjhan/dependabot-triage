@@ -27,6 +27,9 @@ inputs:
   dry-run:
     description: Analyze and render the report without dismissing alerts, pushing branches or opening issues and pull requests
     default: "false"
+  upload-report:
+    description: Upload the JSON results and rendered markdown as a workflow artifact
+    default: "false"
   git-user-name:
     description: Commit author name
     default: github-actions[bot]
@@ -77,3 +80,12 @@ runs:
         fi
         export CLAUDE_BIN="$GITHUB_ACTION_PATH/node_modules/.bin/claude"
         node "$GITHUB_ACTION_PATH/src/main.ts"
+
+    - name: Upload report
+      if: always() && inputs.upload-report == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: dependabot-triage-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/dependabot-triage
+        retention-days: 14
+        if-no-files-found: ignore

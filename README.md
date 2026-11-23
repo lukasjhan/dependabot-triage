@@ -71,6 +71,8 @@ jobs:
 
 Scheduled runs publish for real. Manual runs default to a dry run, which writes the report to the job summary only.
 
+Set `upload-report: true` to keep the JSON results and rendered markdown as a workflow artifact for 14 days. The artifact contains the analysis of your code, so it is visible to anyone who can read the repository's Actions runs.
+
 ## Configuration
 
 Pass the configuration inline with the `settings` input, or keep it in `.github/dependabot-triage.yml`. `settings` wins when both are present. Every key is optional:

@@ -48,6 +48,7 @@ export type PackageFacts = {
   malware: boolean;
   targetVersion: string | null;
   targetPublishedAt: string | null;
+  vulnerableRanges: string[];
   installed: string[];
   prodReachable: boolean;
   existingOverride: string | null;

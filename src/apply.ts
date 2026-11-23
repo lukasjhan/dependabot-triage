@@ -13,6 +13,7 @@ type Options = {
   cwd: string;
   verify: string[];
   now?: Date;
+  baseline?: Map<string, string[]>;
 };
 
 type Candidate = { decision: Decision; facts: PackageFacts };
@@ -48,6 +49,10 @@ export async function apply(gh: GitHub, classification: Classification, facts: P
   }
 
   if (candidates.length === 0) return result;
+
+  const baseline = new Map<string, string[]>();
+  for (const c of candidates) baseline.set(c.facts.package, await installedVersions(opts.cwd, c.facts.package));
+  opts = { ...opts, baseline };
 
   const together = await attempt(candidates, opts);
   if (together.ok) {
@@ -101,15 +106,16 @@ async function attempt(candidates: Candidate[], opts: Options): Promise<Attempt>
   const applied: ApplyResult["applied"] = [];
   for (const c of candidates) {
     const versions = await installedVersions(opts.cwd, c.facts.package);
-    const target = c.facts.targetVersion!;
-    if (versions.length === 0 || versions.some((v) => semver.lt(v, target))) {
-      return { ok: false, reason: "not-resolved", log: `${c.facts.package} resolved to ${versions.join(", ") || "nothing"}, need >= ${target}` };
+    const still = versions.filter((v) => c.facts.vulnerableRanges.some((r) => semver.satisfies(v, r)));
+    if (still.length > 0) {
+      return { ok: false, reason: "not-resolved", log: `${c.facts.package} still resolves to vulnerable ${still.join(", ")}` };
     }
+    const untouched = new Set((opts.baseline?.get(c.facts.package) ?? []).filter((v) => !c.facts.installed.includes(v)));
     applied.push({
       package: c.facts.package,
       method: c.decision.class as "lockfile" | "override",
       from: c.facts.installed,
-      to: versions,
+      to: versions.filter((v) => !untouched.has(v)).sort(semver.compare),
     });
   }
 
