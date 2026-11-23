@@ -13,6 +13,7 @@ type Options = {
   language: string;
   minSeverity: Severity;
   model?: string;
+  maxBudgetUsd?: number;
 };
 
 type ClaudeDecision = Omit<Decision, "alerts" | "severity" | "enforced">;
@@ -25,7 +26,10 @@ export async function classify(facts: PackageFacts[], alerts: Alert[], opts: Opt
   if (included.length === 0) return { packages: [], excluded };
 
   const prompt = await buildPrompt(included, alerts, opts.language);
-  const output = await runClaude(prompt, opts);
+  const output = await runClaude(prompt, opts).catch((err: Error) => {
+    console.error(`classification unavailable: ${err.message}`);
+    return { packages: [] as ClaudeDecision[] };
+  });
   const byName = new Map(output.packages.map((p) => [p.package, p]));
 
   return {
@@ -67,8 +71,9 @@ async function runClaude(prompt: string, opts: Options): Promise<{ packages: Cla
     "--allowedTools",
     "Bash(npm view:*)",
     ...(opts.model ? ["--model", opts.model] : []),
+    ...(opts.maxBudgetUsd ? ["--max-budget-usd", String(opts.maxBudgetUsd)] : []),
   ];
-  const stdout = await run("claude", args, prompt, opts.cwd);
+  const stdout = await run(process.env.CLAUDE_BIN ?? "claude", args, prompt, opts.cwd);
   const result = JSON.parse(stdout) as {
     is_error: boolean;
     subtype: string;
@@ -175,6 +180,7 @@ if (import.meta.main) {
     language: process.env.TRIAGE_LANGUAGE ?? "en",
     minSeverity: (process.env.TRIAGE_MIN_SEVERITY as Severity | undefined) ?? "low",
     model: process.env.TRIAGE_MODEL,
+    maxBudgetUsd: process.env.TRIAGE_MAX_BUDGET_USD ? Number(process.env.TRIAGE_MAX_BUDGET_USD) : undefined,
   });
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, JSON.stringify(result, null, 2));

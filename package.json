@@ -13,10 +13,13 @@
     "facts": "node src/facts.ts",
     "classify": "node src/classify.ts",
     "apply": "node src/apply.ts",
-    "publish": "node src/publish.ts"
+    "publish": "node src/publish.ts",
+    "start": "node src/main.ts"
   },
   "dependencies": {
-    "semver": "7.8.6"
+    "@anthropic-ai/claude-code": "2.1.319",
+    "semver": "7.8.6",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

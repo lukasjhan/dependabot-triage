@@ -15,6 +15,7 @@ export type PublishOptions = {
   branchPrefix: string;
   labels: string[];
   dryRun: boolean;
+  dismissDevOnly: boolean;
   runId: string | null;
   manual: boolean;
   now?: Date;
@@ -39,7 +40,7 @@ export async function publish(gh: GitHub, report: Omit<Report, "label">, opts: P
     return { issue: null, pr: null, branch: null, dismissed: [] };
   }
 
-  for (const n of devOnly) await dismiss(gh, n);
+  if (opts.dismissDevOnly) for (const n of devOnly) await dismiss(gh, n);
   await ensureLabels(gh, opts.labels);
 
   const issue = await gh.request<{ number: number }>(`${gh.repoPath}/issues`, {
@@ -61,7 +62,7 @@ export async function publish(gh: GitHub, report: Omit<Report, "label">, opts: P
   }
 
   await summary(`Created #${issue.number}${pr ? ` and #${pr}` : ""} for ${issueTitle(full)}`);
-  return { issue: issue.number, pr, branch, dismissed: devOnly };
+  return { issue: issue.number, pr, branch, dismissed: opts.dismissDevOnly ? devOnly : [] };
 }
 
 async function dismiss(gh: GitHub, alert: number): Promise<void> {
@@ -93,7 +94,7 @@ async function pushBranch(gh: GitHub, opts: PublishOptions, wanted: string, mess
   await git("add", "package.json", "pnpm-lock.yaml");
   await git("commit", "-m", message);
   const remote = `https://x-access-token:${gh.token}@github.com/${gh.owner}/${gh.repo}.git`;
-  await git("push", remote, `HEAD:refs/heads/${branch}`);
+  await git("-c", "http.https://github.com/.extraheader=", "push", remote, `HEAD:refs/heads/${branch}`);
   return branch;
 }
 
@@ -133,6 +134,7 @@ if (import.meta.main) {
       facts: await read<PackageFacts[]>("facts.json"),
       classification: await read<Classification>("classification.json"),
       apply: await read<ApplyResult>("apply.json"),
+      dismissDevOnly: process.env.TRIAGE_DISMISS_DEV_ONLY !== "false",
       runUrl: runId ? `${server}/${process.env.GITHUB_REPOSITORY}/actions/runs/${runId}` : null,
     },
     {
@@ -142,6 +144,7 @@ if (import.meta.main) {
       branchPrefix: process.env.TRIAGE_BRANCH_PREFIX ?? "security/",
       labels: (process.env.TRIAGE_LABELS ?? "security,dependencies").split(",").map((s) => s.trim()).filter(Boolean),
       dryRun: process.env.TRIAGE_DRY_RUN !== "false",
+      dismissDevOnly: process.env.TRIAGE_DISMISS_DEV_ONLY !== "false",
       runId,
       manual: process.env.GITHUB_EVENT_NAME === "workflow_dispatch",
     },

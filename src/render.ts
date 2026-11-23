@@ -6,6 +6,7 @@ export type Report = {
   facts: PackageFacts[];
   classification: Classification;
   apply: ApplyResult;
+  dismissDevOnly: boolean;
   runUrl: string | null;
 };
 
@@ -85,8 +86,10 @@ export function issueBody(r: Report, pr: number | null): string {
   if (dismissed.length > 0) {
     parts.push(
       section(
-        "## 🗂️ Dismissed (dev-only)",
-        "These packages do not reach the production runtime. Their alerts were dismissed as tolerable risk.",
+        r.dismissDevOnly ? "## 🗂️ Dismissed (dev-only)" : "## 🗂️ Dev-only",
+        r.dismissDevOnly
+          ? "These packages do not reach the production runtime. Their alerts were dismissed as tolerable risk."
+          : "These packages do not reach the production runtime. Their alerts were left open.",
         table(
           ["Package", "Alerts", "Severity", "Reason"],
           dismissed.map((d) => [
@@ -145,7 +148,7 @@ function summary(r: Report, pr: number | null, applied: number, review: number, 
   const bits = [`**${r.alerts.length}** open alerts in **${packages}** packages`];
   if (applied) bits.push(`**${applied}** patched${pr ? ` in #${pr}` : ""}`);
   if (review) bits.push(`**${review}** need review`);
-  if (dismissed) bits.push(`**${dismissed}** dismissed`);
+  if (dismissed) bits.push(`**${dismissed}** dev-only`);
   return bits.join(" · ");
 }
 

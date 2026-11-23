@@ -1,0 +1,65 @@
+name: Dependabot Triage
+description: Triage Dependabot alerts with Claude, open a patch pull request and a weekly report issue
+author: lukasjhan
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  github-token:
+    description: GitHub App installation token or fine-grained PAT with Contents, Pull requests, Issues and Dependabot alerts read and write
+    required: true
+  anthropic-api-key:
+    description: Anthropic API key used by Claude Code
+    required: true
+  config:
+    description: Path to the configuration file, relative to working-directory
+    default: .github/dependabot-triage.yml
+  working-directory:
+    description: Directory of the project to triage
+    default: .
+  dry-run:
+    description: Analyze and render the report without dismissing alerts, pushing branches or opening issues and pull requests
+    default: "false"
+  git-user-name:
+    description: Commit author name
+    default: github-actions[bot]
+  git-user-email:
+    description: Commit author email
+    default: 41898282+github-actions[bot]@users.noreply.github.com
+
+outputs:
+  issue-number:
+    description: Number of the report issue
+    value: ${{ steps.run.outputs.issue-number }}
+  pr-number:
+    description: Number of the patch pull request, empty when none was opened
+    value: ${{ steps.run.outputs.pr-number }}
+  report-dir:
+    description: Directory with the JSON results and rendered markdown
+    value: ${{ steps.run.outputs.report-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install dependabot-triage
+      shell: bash
+      run: npm ci --omit=dev --no-audit --no-fund --prefix "$GITHUB_ACTION_PATH"
+
+    - name: Run
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        TRIAGE_CONFIG: ${{ inputs.config }}
+        TRIAGE_DRY_RUN: ${{ inputs.dry-run }}
+        TRIAGE_OUT: ${{ runner.temp }}/dependabot-triage
+        GIT_AUTHOR_NAME: ${{ inputs.git-user-name }}
+        GIT_AUTHOR_EMAIL: ${{ inputs.git-user-email }}
+        GIT_COMMITTER_NAME: ${{ inputs.git-user-name }}
+        GIT_COMMITTER_EMAIL: ${{ inputs.git-user-email }}
+      run: |
+        export CLAUDE_BIN="$GITHUB_ACTION_PATH/node_modules/.bin/claude"
+        node "$GITHUB_ACTION_PATH/src/main.ts"
