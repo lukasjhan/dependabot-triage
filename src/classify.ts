@@ -158,8 +158,10 @@ function sanitize(d: ClaudeDecision): ClaudeDecision {
 function clean(text: string): string {
   return text
     .replace(/\bhttps?:\/\/\S+/gi, "[link removed]")
-    .replace(/@(?=[\w-])/g, "@​")
     .replace(/<[^>]*>/g, "")
+    .split(/(`[^`]*`)/)
+    .map((part) => (part.startsWith("`") ? part : part.replace(/@[\w-]+(?:\/[\w.-]+)?/g, "`$&`")))
+    .join("")
     .trim();
 }
 
