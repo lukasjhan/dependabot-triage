@@ -66,3 +66,24 @@ export type Changelog = {
   compareUrl: string | null;
   text: string | null;
 };
+
+export type DecisionClass = "lockfile" | "override" | "manual" | "dev-only";
+
+export type Decision = {
+  package: string;
+  alerts: number[];
+  severity: Severity;
+  class: DecisionClass;
+  risk: "none" | "low" | "medium" | "high";
+  reason: string;
+  impact: string;
+  usage: { file: string; line?: number; note: string }[];
+  action: string;
+  breakingChanges: string[];
+  enforced: string[];
+};
+
+export type Classification = {
+  packages: Decision[];
+  excluded: { package: string; severity: Severity; alerts: number[] }[];
+};

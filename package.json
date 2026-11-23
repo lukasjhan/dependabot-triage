@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc",
     "collect": "node src/collect.ts",
-    "facts": "node src/facts.ts"
+    "facts": "node src/facts.ts",
+    "classify": "node src/classify.ts"
   },
   "dependencies": {
     "semver": "7.8.6"
