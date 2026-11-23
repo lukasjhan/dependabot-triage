@@ -87,3 +87,11 @@ export type Classification = {
   packages: Decision[];
   excluded: { package: string; severity: Severity; alerts: number[] }[];
 };
+
+export type ApplyResult = {
+  applied: { package: string; method: "lockfile" | "override"; from: string[]; to: string[] }[];
+  deferred: { package: string; reason: "minimum-release-age"; availableAt: string }[];
+  skipped: { package: string; reason: "dependabot-pr"; pr: number }[];
+  failed: { package: string; reason: "existing-override" | "install-failed" | "not-resolved" | "verify-failed"; log: string }[];
+  verify: { command: string; ok: boolean }[];
+};
