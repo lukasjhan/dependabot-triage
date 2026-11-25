@@ -31,11 +31,9 @@ export async function facts(gh: GitHub, alerts: Alert[], cwd: string): Promise<P
 }
 
 async function packageFacts(gh: GitHub, name: string, alerts: Alert[], cwd: string, root: Manifest): Promise<PackageFacts> {
-  const patched = alerts.map((a) => a.patchedVersion);
-  const targetVersion = patched.includes(null) ? null : semver.rsort(patched as string[])[0];
-
   const ranges = [...new Set(alerts.map((a) => normalizeRange(a.vulnerableRange)))];
   const vulnerable = (version: string) => ranges.some((r) => semver.satisfies(version, r));
+  const targetVersion = await safeVersion(name, alerts, vulnerable);
 
   const all = await why(name, cwd, false);
   const prod = await why(name, cwd, true);
@@ -65,6 +63,15 @@ async function why(name: string, cwd: string, prodOnly: boolean): Promise<WhyNod
   const args = ["why", name, "-r", "--json", ...(prodOnly ? ["--prod"] : [])];
   const { stdout } = await exec("pnpm", args, { cwd, maxBuffer: 64 * 1024 * 1024 });
   return stdout.trim() ? (JSON.parse(stdout) as WhyNode[]) : [];
+}
+
+async function safeVersion(name: string, alerts: Alert[], vulnerable: (version: string) => boolean): Promise<string | null> {
+  const known = alerts.map((a) => a.patchedVersion).filter((v): v is string => v !== null && semver.valid(v) !== null);
+  const floor = known.length > 0 ? semver.rsort([...known])[0] : null;
+  const versions = Object.keys((await packument(name)).versions)
+    .filter((v) => semver.valid(v) && !semver.prerelease(v))
+    .sort(semver.compare);
+  return versions.find((v) => (!floor || semver.gte(v, floor)) && !vulnerable(v)) ?? null;
 }
 
 export function normalizeRange(range: string): string {
